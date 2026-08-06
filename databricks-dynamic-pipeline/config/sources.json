@@ -1,0 +1,47 @@
+[
+  {
+    "source_name": "olist_orders",
+    "layer": "bronze_to_silver",
+    "source_type": "auto_loader",
+    "source_format": "csv",
+    "source_path": "/Volumes/main/default/raw_landing/orders/",
+    "read_options": { "header": "true" },
+    "silver_transform": {
+      "mode": "cdc_merge",
+      "primary_key": "order_id",
+      "sequence_col": "order_purchase_timestamp"
+    }
+  },
+  {
+    "source_name": "olist_reviews",
+    "layer": "bronze_to_silver",
+    "source_type": "auto_loader",
+    "source_format": "json",
+    "source_path": "/Volumes/main/default/raw_landing/reviews/",
+    "read_options": { "multiline": "false" },
+    "silver_transform": {
+      "mode": "auto",
+      "drop_nulls": ["review_id"]
+    }
+  },
+  {
+    "source_name": "olist_customers",
+    "layer": "bronze_to_silver",
+    "source_type": "auto_loader",
+    "source_format": "csv",
+    "source_path": "/Volumes/main/default/raw_landing/customers/",
+    "read_options": { "header": "true" },
+    "silver_transform": {
+      "mode": "auto",
+      "drop_nulls": ["customer_id"]
+    }
+  },
+  {
+    "source_name": "customer_order_reviews_gold",
+    "layer": "gold_custom",
+    "gold_transform": {
+      "mode": "custom_python",
+      "function_name": "join_ecom_domain"
+    }
+  }
+]
