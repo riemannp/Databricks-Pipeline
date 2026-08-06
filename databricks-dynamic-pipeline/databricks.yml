@@ -1,0 +1,33 @@
+bundle:
+  name: databricks-dynamic-pipeline
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+
+  prod:
+    mode: production
+    workspace:
+      root_path: /Workspace/Production/pipelines/${bundle.name}
+
+resources:
+  jobs:
+    ecom_medallion_job:
+      name: ECom_Medallion_Pipeline
+      tasks:
+        - task_key: export_config
+          spark_python_task:
+            python_file: src/00_config_exporter.py
+        - task_key: gold_processing
+          depends_on:
+            - task_key: export_config
+          spark_python_task:
+            python_file: src/03_gold.py
+        - task_key: maintenance
+          depends_on:
+            - task_key: gold_processing
+          spark_python_task:
+            python_file: src/04_maintenance.py
