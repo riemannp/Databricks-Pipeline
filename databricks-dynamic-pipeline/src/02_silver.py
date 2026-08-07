@@ -1,12 +1,38 @@
+# Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "2"
+# ///
 import json
 from delta.tables import DeltaTable
 from pyspark.sql import functions as F
 from databricks.sdk.runtime import dbutils, spark
 
-raw_json = dbutils.widgets.get("config_json")
+# Configuration - can be provided via widget or uses default for testing
+try:
+    raw_json = dbutils.widgets.get("config_json")
+    if not raw_json or raw_json == "{}":
+        raise ValueError("Empty configuration provided")
+except Exception as e:
+    # Fallback to default configuration for direct execution/testing
+    print("INFO: No widget configuration found. Using default test configuration for 'orders'")
+    raw_json = json.dumps({
+        "source_name": "orders",
+        "silver_transform": {
+            "mode": "overwrite",
+            "drop_nulls": ["order_id"]
+        }
+    })
+    
 cfg = json.loads(raw_json)
-source_name = cfg["source_name"]
+source_name = cfg.get("source_name")
 transform_cfg = cfg.get("silver_transform", {})
+
+if not source_name:
+    raise ValueError(
+        "Missing 'source_name' in configuration. "
+        "Please provide a valid source name: orders, customers, or reviews"
+    )
 
 df_bronze = spark.table(f"main.bronze.{source_name}")
 

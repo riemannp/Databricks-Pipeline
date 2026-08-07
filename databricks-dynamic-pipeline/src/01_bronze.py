@@ -1,3 +1,5 @@
+# Databricks notebook source
+
 import sys
 import json
 from pyspark.sql import functions as F

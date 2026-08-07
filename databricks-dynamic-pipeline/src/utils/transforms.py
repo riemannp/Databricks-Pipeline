@@ -2,8 +2,18 @@ from pyspark.sql import functions as F
 
 def sanitize_column_names(df):
     """Standardizes column naming conventions for optimal Delta parquet storage."""
+    used_names = set()
     for col in df.columns:
         clean_col = col.strip().lower().replace(" ", "_").replace("-", "_")
+        # Handle duplicate column names by adding suffix
+        if clean_col in used_names:
+            counter = 1
+            candidate = f"{clean_col}_{counter}"
+            while candidate in used_names:
+                counter += 1
+                candidate = f"{clean_col}_{counter}"
+            clean_col = candidate
+        used_names.add(clean_col)
         df = df.withColumnRenamed(col, clean_col)
     return df
 

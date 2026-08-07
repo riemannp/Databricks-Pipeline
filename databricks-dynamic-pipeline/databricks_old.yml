@@ -17,6 +17,21 @@ resources:
   jobs:
     ecom_medallion_job:
       name: ECom_Medallion_Pipeline
+      job_clusters:
+        - job_cluster_key: serverless
+          new_cluster:
+            num_workers: 0
+            spark_version: "15.4.x-scala2.12"
+            node_type_id: "i3.xlarge"
+            runtime_engine: PHOTON
+            data_security_mode: USER_ISOLATION
+            aws_attributes:
+              availability: ON_DEMAND
+            spark_conf:
+              spark.databricks.cluster.profile: singleNode
+              spark.master: local[*]
+            custom_tags:
+              ResourceClass: SingleNode
       schedule:
         quartz_cron_expression: "0 0 2 * * ?"  # Daily at 2 AM UTC
         timezone_id: "UTC"
@@ -39,7 +54,7 @@ resources:
       tasks:
         # Task 1: Export and validate configuration
         - task_key: export_config
-          timeout_seconds: 300
+          timeout_seconds: 300  # 5 minutes
           max_retries: 2
           notebook_task:
             notebook_path: src/00_config_exporter.py
@@ -47,7 +62,7 @@ resources:
         
         # Task 2: Bronze layer - Ingest orders
         - task_key: bronze_orders
-          timeout_seconds: 1800
+          timeout_seconds: 1800  # 30 minutes
           max_retries: 3
           depends_on:
             - task_key: export_config
@@ -59,7 +74,7 @@ resources:
         
         # Task 3: Bronze layer - Ingest customers
         - task_key: bronze_customers
-          timeout_seconds: 1800
+          timeout_seconds: 1800  # 30 minutes
           max_retries: 3
           depends_on:
             - task_key: export_config
@@ -71,7 +86,7 @@ resources:
         
         # Task 4: Bronze layer - Ingest reviews
         - task_key: bronze_reviews
-          timeout_seconds: 1800
+          timeout_seconds: 1800  # 30 minutes
           max_retries: 3
           depends_on:
             - task_key: export_config
@@ -83,7 +98,7 @@ resources:
         
         # Task 5: Silver layer - Transform orders
         - task_key: silver_orders
-          timeout_seconds: 1800
+          timeout_seconds: 1800  # 30 minutes
           max_retries: 3
           depends_on:
             - task_key: bronze_orders
@@ -91,35 +106,36 @@ resources:
             notebook_path: src/02_silver.py
             source: WORKSPACE
             base_parameters:
-              config_json: '{"source_name": "orders", "silver_transform": {"mode": "append", "drop_nulls": ["order_id"]}}'
+              config_json:
+              - '{"source_name": "orders", "silver_transform": {"mode": "overwrite", "drop_nulls": ["order_id"]}}'
         
         # Task 6: Silver layer - Transform customers
         - task_key: silver_customers
-          timeout_seconds: 1800
+          timeout_seconds: 1800  # 30 minutes
           max_retries: 3
           depends_on:
             - task_key: bronze_customers
           notebook_task:
             notebook_path: src/02_silver.py
             source: WORKSPACE
-            base_parameters:
-              config_json: '{"source_name": "customers", "silver_transform": {"mode": "append", "drop_nulls": ["customer_id"]}}'
+            parameters:
+              - '{"source_name": "customers", "silver_transform": {"mode": "overwrite", "drop_nulls": ["customer_id"]}}'
         
         # Task 7: Silver layer - Transform reviews
         - task_key: silver_reviews
-          timeout_seconds: 1800
+          timeout_seconds: 1800  # 30 minutes
           max_retries: 3
           depends_on:
             - task_key: bronze_reviews
           notebook_task:
             notebook_path: src/02_silver.py
             source: WORKSPACE
-            base_parameters:
-              config_json: '{"source_name": "reviews", "silver_transform": {"mode": "append", "drop_nulls": ["review_id"]}}'
+            parameters:
+              - '{"source_name": "reviews", "silver_transform": {"mode": "overwrite", "drop_nulls": ["review_id"]}}'
         
         # Task 8: Gold layer - Create analytics tables
         - task_key: gold_processing
-          timeout_seconds: 2400
+          timeout_seconds: 2400  # 40 minutes
           max_retries: 2
           depends_on:
             - task_key: silver_orders
@@ -131,7 +147,7 @@ resources:
         
         # Task 9: Maintenance - Optimize all tables
         - task_key: maintenance
-          timeout_seconds: 3600
+          timeout_seconds: 3600  # 60 minutes
           max_retries: 1
           depends_on:
             - task_key: gold_processing
