@@ -1,7 +1,7 @@
 import json
 import os
-
 import pytest
+
 
 CONFIG_PATH = "config/sources.json"
 

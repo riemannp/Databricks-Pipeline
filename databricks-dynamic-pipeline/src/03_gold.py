@@ -1,10 +1,8 @@
 # Databricks notebook source
 
 import json
-
-from databricks.sdk.runtime import dbutils, spark
 from pyspark.sql import functions as F
-
+from databricks.sdk.runtime import dbutils, spark
 from utils.transforms import custom_transform_registry
 
 try:

@@ -7,8 +7,9 @@ This task runs first in the DAB job to validate and prepare configurations.
 """
 
 import json
-
-from databricks.sdk.runtime import dbutils
+import sys
+from pathlib import Path
+from databricks.sdk.runtime import dbutils, spark
 
 # Determine config file path based on execution context
 config_path = "/Workspace/Users/panagiotiskoutridis@gmail.com/Databricks-Pipeline/databricks-dynamic-pipeline/config/sources.json"
@@ -66,18 +67,18 @@ print("=" * 70)
 try:
     # Store full config as task value for other tasks to reference
     dbutils.jobs.taskValues.set(key="pipeline_config", value=json.dumps(sources))
-
+    
     # Export source names by layer for easy filtering
     bronze_sources = [s["source_name"] for s in sources if s["layer"] == "bronze_to_silver"]
     gold_sources = [s["source_name"] for s in sources if "gold" in s["layer"]]
-
+    
     dbutils.jobs.taskValues.set(key="bronze_sources", value=json.dumps(bronze_sources))
     dbutils.jobs.taskValues.set(key="gold_sources", value=json.dumps(gold_sources))
-
+    
     print(f"✓ Exported {len(bronze_sources)} bronze sources")
     print(f"✓ Exported {len(gold_sources)} gold sources")
-    print("✓ Pipeline configuration ready for downstream tasks")
-
+    print(f"✓ Pipeline configuration ready for downstream tasks")
+    
 except Exception as e:
     print(f"⚠ Warning: Could not set task values (may not be running in job context): {e}")
     print("   Continuing anyway - config validation successful")

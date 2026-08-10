@@ -1,7 +1,7 @@
 import pytest
 from pyspark.sql import SparkSession
-
-from src.utils.transforms import custom_transform_registry, sanitize_column_names
+from pyspark.sql import functions as F
+from src.utils.transforms import sanitize_column_names, custom_transform_registry
 
 
 @pytest.fixture(scope="module")
@@ -134,9 +134,8 @@ class TestJoinEcomDomain:
 
     def test_function_callable(self):
         """Verify function is callable and accepts spark parameter."""
-        import inspect
-
         from src.utils.transforms import join_ecom_domain
+        import inspect
 
         assert callable(join_ecom_domain)
         sig = inspect.signature(join_ecom_domain)

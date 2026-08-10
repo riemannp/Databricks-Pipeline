@@ -4,17 +4,16 @@
 # environment_version = "2"
 # ///
 import json
-
-from databricks.sdk.runtime import dbutils, spark
 from delta.tables import DeltaTable
 from pyspark.sql import functions as F
+from databricks.sdk.runtime import dbutils, spark
 
 # Configuration - can be provided via widget or uses default for testing
 try:
     raw_json = dbutils.widgets.get("config_json")
     if not raw_json or raw_json == "{}":
         raise ValueError("Empty configuration provided")
-except Exception:
+except Exception as e:
     # Fallback to default configuration for direct execution/testing
     print("INFO: No widget configuration found. Using default test configuration for 'orders'")
     raw_json = json.dumps({
@@ -24,7 +23,7 @@ except Exception:
             "drop_nulls": ["order_id"]
         }
     })
-
+    
 cfg = json.loads(raw_json)
 source_name = cfg.get("source_name")
 transform_cfg = cfg.get("silver_transform", {})
@@ -56,7 +55,7 @@ if source_name == "orders":
         .withColumn("order_delivered_carrier_date", F.to_timestamp("order_delivered_carrier_date"))
         .withColumn("order_delivered_customer_date", F.to_timestamp("order_delivered_customer_date"))
         .withColumn("order_estimated_delivery_date", F.to_timestamp("order_estimated_delivery_date"))
-        .withColumn("approval_delay_hours",
+        .withColumn("approval_delay_hours", 
                     F.round((F.unix_timestamp("order_approved_at") - F.unix_timestamp("order_purchase_timestamp")) / 3600, 2))
         .withColumn("delivery_delay_days",
                     F.datediff("order_delivered_customer_date", "order_estimated_delivery_date"))
