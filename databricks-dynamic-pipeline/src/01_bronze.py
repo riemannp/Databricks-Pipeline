@@ -1,9 +1,11 @@
 # Databricks notebook source
 
-import sys
 import json
-from pyspark.sql import functions as F
+import sys
+
 from databricks.sdk.runtime import dbutils, spark
+from pyspark.sql import functions as F
+
 from utils.transforms import sanitize_column_names
 
 # Get config_json from widget (notebook exec) or command line (DAB task)
@@ -29,12 +31,12 @@ if not raw_json or not raw_json.strip():
         "read_options": {"header": "true"}
     })
 
-print(f"DEBUG: raw_json = {repr(raw_json[:200] if len(raw_json) > 200 else raw_json)}")
+print(f"DEBUG: raw_json = {raw_json[:200] if len(raw_json) > 200 else raw_json!r}")
 
 try:
     cfg = json.loads(raw_json)
 except json.JSONDecodeError as e:
-    raise ValueError(f"Invalid JSON config: {e}. Received: {repr(raw_json[:100])}")
+    raise ValueError(f"Invalid JSON config: {e}. Received: {raw_json[:100]!r}")
 
 if "source_name" not in cfg:
     raise ValueError(f"Config missing 'source_name' field. Received config: {cfg}")

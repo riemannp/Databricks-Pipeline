@@ -2,7 +2,6 @@
 import pytest
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DoubleType, TimestampType
 
 
 @pytest.fixture(scope="module")
@@ -26,11 +25,11 @@ class TestCustomerOrderSummary:
             ("customer_2", "order_3")
         ]
         df = spark.createDataFrame(data, ["customer_id", "order_id"])
-        
+
         result_df = df.groupBy("customer_id").agg(
             F.count("order_id").alias("total_orders")
         )
-        
+
         results = result_df.collect()
         customer_1_orders = [r for r in results if r["customer_id"] == "customer_1"][0]
         assert customer_1_orders["total_orders"] == 2
@@ -43,11 +42,11 @@ class TestCustomerOrderSummary:
             ("customer_1", "order_2")
         ]
         df = spark.createDataFrame(data, ["customer_id", "order_id"])
-        
+
         result_df = df.groupBy("customer_id").agg(
             F.countDistinct("order_id").alias("total_orders")
         )
-        
+
         result = result_df.collect()[0]
         assert result["total_orders"] == 2  # Only 2 distinct orders
 
@@ -59,11 +58,11 @@ class TestCustomerOrderSummary:
             ("customer_2", "order_3", 150.0)
         ]
         df = spark.createDataFrame(data, ["customer_id", "order_id", "order_value"])
-        
+
         result_df = df.groupBy("customer_id").agg(
             F.avg("order_value").alias("avg_order_value")
         )
-        
+
         customer_1 = result_df.filter("customer_id = 'customer_1'").collect()[0]
         assert customer_1["avg_order_value"] == 150.0  # (100 + 200) / 2
 
@@ -75,11 +74,11 @@ class TestCustomerOrderSummary:
             ("customer_2", 150.0)
         ]
         df = spark.createDataFrame(data, ["customer_id", "order_value"])
-        
+
         result_df = df.groupBy("customer_id").agg(
             F.sum("order_value").alias("total_spend")
         )
-        
+
         customer_1 = result_df.filter("customer_id = 'customer_1'").collect()[0]
         assert customer_1["total_spend"] == 300.0
 
@@ -92,11 +91,11 @@ class TestCustomerOrderSummary:
         ]
         df = spark.createDataFrame(data, ["customer_id", "order_timestamp"])
         df = df.withColumn("order_timestamp", F.to_timestamp("order_timestamp"))
-        
+
         result_df = df.groupBy("customer_id").agg(
             F.max("order_timestamp").alias("latest_order")
         )
-        
+
         customer_1 = result_df.filter("customer_id = 'customer_1'").collect()[0]
         assert str(customer_1["latest_order"]) == "2024-01-20 15:30:00"
 
@@ -112,9 +111,9 @@ class TestOrderPerformanceMetrics:
             ("order_3", 3.5)
         ]
         df = spark.createDataFrame(data, ["order_id", "approval_delay_hours"])
-        
+
         avg_delay = df.agg(F.avg("approval_delay_hours").alias("avg_delay")).collect()[0]["avg_delay"]
-        
+
         assert round(avg_delay, 2) == 2.33  # (2.5 + 1.0 + 3.5) / 3
 
     def test_delivery_delay_statistics(self, spark):
@@ -126,13 +125,13 @@ class TestOrderPerformanceMetrics:
             ("order_4", 10)   # 10 days late
         ]
         df = spark.createDataFrame(data, ["order_id", "delivery_delay_days"])
-        
+
         result = df.agg(
             F.min("delivery_delay_days").alias("min_delay"),
             F.max("delivery_delay_days").alias("max_delay"),
             F.avg("delivery_delay_days").alias("avg_delay")
         ).collect()[0]
-        
+
         assert result["min_delay"] == -2
         assert result["max_delay"] == 10
         assert result["avg_delay"] == 3.25  # (5 + (-2) + 0 + 10) / 4
@@ -146,12 +145,12 @@ class TestOrderPerformanceMetrics:
             ("order_4", "canceled")
         ]
         df = spark.createDataFrame(data, ["order_id", "order_status"])
-        
+
         result = df.agg(
             F.count("*").alias("total_orders"),
             F.sum(F.when(F.col("order_status") == "canceled", 1).otherwise(0)).alias("canceled_orders")
         ).collect()[0]
-        
+
         cancellation_rate = (result["canceled_orders"] / result["total_orders"]) * 100
         assert cancellation_rate == 50.0  # 2 out of 4 canceled
 
@@ -168,11 +167,11 @@ class TestGeographicAnalysis:
             ("SP", "order_4")
         ]
         df = spark.createDataFrame(data, ["customer_state", "order_id"])
-        
+
         result_df = df.groupBy("customer_state").agg(
             F.count("order_id").alias("total_orders")
         ).orderBy(F.desc("total_orders"))
-        
+
         results = result_df.collect()
         assert results[0]["customer_state"] == "SP"
         assert results[0]["total_orders"] == 3
@@ -186,11 +185,11 @@ class TestGeographicAnalysis:
             ("RJ", "RIO DE JANEIRO", "order_4")
         ]
         df = spark.createDataFrame(data, ["customer_state", "customer_city", "order_id"])
-        
+
         result_df = df.groupBy("customer_state", "customer_city").agg(
             F.count("order_id").alias("total_orders")
         )
-        
+
         sao_paulo = result_df.filter(
             "customer_state = 'SP' AND customer_city = 'SAO PAULO'"
         ).collect()[0]
@@ -204,11 +203,11 @@ class TestGeographicAnalysis:
             ("RJ", 150.0)
         ]
         df = spark.createDataFrame(data, ["customer_state", "order_value"])
-        
+
         result_df = df.groupBy("customer_state").agg(
             F.sum("order_value").alias("total_revenue")
         ).orderBy(F.desc("total_revenue"))
-        
+
         top_state = result_df.collect()[0]
         assert top_state["customer_state"] == "SP"
         assert top_state["total_revenue"] == 300.0
@@ -225,11 +224,11 @@ class TestReviewAnalytics:
             ("product_1", 5)
         ]
         df = spark.createDataFrame(data, ["product_id", "review_score"])
-        
+
         result = df.groupBy("product_id").agg(
             F.avg("review_score").alias("avg_score")
         ).collect()[0]
-        
+
         assert round(result["avg_score"], 2) == 4.67  # (5 + 4 + 5) / 3
 
     def test_review_score_distribution(self, spark):
@@ -242,11 +241,11 @@ class TestReviewAnalytics:
             ("review_5", 5)
         ]
         df = spark.createDataFrame(data, ["review_id", "review_score"])
-        
+
         result_df = df.groupBy("review_score").agg(
             F.count("*").alias("count")
         ).orderBy("review_score")
-        
+
         results = {r["review_score"]: r["count"] for r in result_df.collect()}
         assert results[5] == 3
         assert results[4] == 1
@@ -260,12 +259,12 @@ class TestReviewAnalytics:
             ("review_3", "Excellent")     # 9 chars
         ]
         df = spark.createDataFrame(data, ["review_id", "review_comment"])
-        
+
         df_with_length = df.withColumn("review_length", F.length("review_comment"))
         avg_length = df_with_length.agg(
             F.avg("review_length").alias("avg_length")
         ).collect()[0]["avg_length"]
-        
+
         assert round(avg_length, 2) == 7.67  # (6 + 8 + 9) / 3
 
 
@@ -283,12 +282,12 @@ class TestJoinOperations:
             ("order_2", "customer_1"),
             ("order_3", "customer_2")
         ]
-        
+
         df_customers = spark.createDataFrame(customers, ["customer_id", "customer_state"])
         df_orders = spark.createDataFrame(orders, ["order_id", "customer_id"])
-        
+
         joined_df = df_orders.join(df_customers, on="customer_id", how="inner")
-        
+
         assert joined_df.count() == 3
         assert "customer_state" in joined_df.columns
 
@@ -304,12 +303,12 @@ class TestJoinOperations:
             ("order_2", 4)
             # order_3 has no review
         ]
-        
+
         df_orders = spark.createDataFrame(orders, ["order_id"])
         df_reviews = spark.createDataFrame(reviews, ["order_id", "review_score"])
-        
+
         joined_df = df_orders.join(df_reviews, on="order_id", how="left")
-        
+
         assert joined_df.count() == 3
         # order_3 should have null review_score
         order_3 = joined_df.filter("order_id = 'order_3'").collect()[0]
@@ -319,12 +318,12 @@ class TestJoinOperations:
         """Verify broadcast hint can be applied for small tables."""
         small_table = [("customer_1", "SP")]
         large_table = [("order_1", "customer_1"), ("order_2", "customer_1")]
-        
+
         df_small = spark.createDataFrame(small_table, ["customer_id", "customer_state"])
         df_large = spark.createDataFrame(large_table, ["order_id", "customer_id"])
-        
+
         # Apply broadcast hint
         joined_df = df_large.join(F.broadcast(df_small), on="customer_id", how="inner")
-        
+
         assert joined_df.count() == 2
         assert "customer_state" in joined_df.columns

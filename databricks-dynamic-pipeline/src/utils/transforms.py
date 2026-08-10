@@ -1,5 +1,6 @@
 from pyspark.sql import functions as F
 
+
 def sanitize_column_names(df):
     """Standardizes column naming conventions for optimal Delta parquet storage."""
     used_names = set()

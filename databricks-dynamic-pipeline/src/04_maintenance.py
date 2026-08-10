@@ -9,6 +9,7 @@ Runs after gold layer processing to maintain optimal query performance.
 
 import json
 from datetime import datetime
+
 from databricks.sdk.runtime import dbutils, spark
 
 # Configuration
@@ -42,13 +43,13 @@ def optimize_table(full_table_name):
     """Run OPTIMIZE on a Delta table"""
     try:
         print(f"  ▶ OPTIMIZE {full_table_name}...", end=" ")
-        
+
         optimize_sql = f"OPTIMIZE {full_table_name}"
         if OPTIMIZE_WHERE_CLAUSE:
             optimize_sql += f" WHERE {OPTIMIZE_WHERE_CLAUSE}"
-        
+
         result = spark.sql(optimize_sql).collect()
-        
+
         if result:
             metrics = result[0]
             files_added = getattr(metrics, 'num_files_added', 0)
@@ -57,7 +58,7 @@ def optimize_table(full_table_name):
         else:
             print("✓ completed")
         return True
-        
+
     except Exception as e:
         print(f"✗ Error: {e}")
         return False
@@ -67,7 +68,7 @@ def vacuum_table(full_table_name, retention_hours):
     if not ENABLE_VACUUM:
         print(f"  ⊗ VACUUM {full_table_name}... (skipped - disabled for safety)")
         return None
-    
+
     try:
         print(f"  ▶ VACUUM {full_table_name}...", end=" ")
         vacuum_sql = f"VACUUM {full_table_name} RETAIN {retention_hours} HOURS"
@@ -103,31 +104,31 @@ for layer in LAYERS:
     print(f"\n{'=' * 70}")
     print(f"Processing schema: {schema}")
     print(f"{'=' * 70}")
-    
+
     tables = get_tables_in_schema(CATALOG, layer)
-    
+
     if not tables:
         print("  (no tables found)")
         continue
-    
+
     print(f"Found {len(tables)} table(s): {', '.join(tables)}\n")
-    
+
     for table_name in tables:
         full_table_name = f"{schema}.{table_name}"
         maintenance_summary["total_tables"] += 1
-        
+
         print(f"\nMaintaining: {full_table_name}")
-        
+
         # Step 1: OPTIMIZE (compact small files)
         if optimize_table(full_table_name):
             maintenance_summary["optimized"] += 1
         else:
             maintenance_summary["failed"] += 1
-        
+
         # Step 2: ANALYZE (update statistics)
         if analyze_table(full_table_name):
             maintenance_summary["analyzed"] += 1
-        
+
         # Step 3: VACUUM (remove old files) - optional
         vacuum_result = vacuum_table(full_table_name, VACUUM_RETENTION_HOURS)
         if vacuum_result is True:
@@ -157,7 +158,7 @@ try:
         value=json.dumps(maintenance_summary)
     )
 except Exception:
-    pass  
+    pass
 
 if maintenance_summary['failed'] > 0:
     raise RuntimeError(

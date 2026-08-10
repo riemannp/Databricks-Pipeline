@@ -1,10 +1,13 @@
 """Tests for Silver layer transformation logic."""
-import pytest
 import json
-from datetime import datetime, timedelta
+
+import pytest
 from pyspark.sql import SparkSession, Window
 from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, DoubleType
+from pyspark.sql.types import (
+    IntegerType,
+    TimestampType,
+)
 
 
 @pytest.fixture(scope="module")
@@ -76,10 +79,10 @@ class TestDataQualityQuarantine:
             ("order_3", "customer_3")
         ]
         df = spark.createDataFrame(data, ["order_id", "customer_id"])
-        
+
         # Simulate drop_nulls logic
         df_clean = df.filter("order_id IS NOT NULL")
-        
+
         assert df_clean.count() == 2
         assert df_clean.filter("order_id IS NULL").count() == 0
 
@@ -91,13 +94,13 @@ class TestDataQualityQuarantine:
             ("order_3", None)
         ]
         df = spark.createDataFrame(data, ["order_id", "customer_id"])
-        
+
         # Simulate quarantine logic for null order_id
         null_condition = "order_id IS NULL"
         df_quarantine = df.filter(null_condition).withColumn(
             "_quarantine_reason", F.lit("Missing primary key")
         )
-        
+
         assert df_quarantine.count() == 1
         assert "_quarantine_reason" in df_quarantine.columns
         reason = df_quarantine.collect()[0]["_quarantine_reason"]
@@ -112,12 +115,12 @@ class TestDataQualityQuarantine:
             ("order_4", "customer_4", None)
         ]
         df = spark.createDataFrame(data, ["order_id", "customer_id", "timestamp"])
-        
+
         # Simulate checking multiple columns
         drop_cols = ["order_id", "customer_id"]
         null_condition = " OR ".join([f"{c} IS NULL" for c in drop_cols])
         df_quarantine = df.filter(null_condition)
-        
+
         assert df_quarantine.count() == 2  # 2 rows have nulls in order_id or customer_id
 
 
@@ -136,11 +139,11 @@ class TestOrdersTransformations:
             "order_purchase_timestamp",
             "order_approved_at"
         ])
-        
+
         df_transformed = df \
             .withColumn("order_purchase_timestamp", F.to_timestamp("order_purchase_timestamp")) \
             .withColumn("order_approved_at", F.to_timestamp("order_approved_at"))
-        
+
         assert df_transformed.schema["order_purchase_timestamp"].dataType == TimestampType()
         assert df_transformed.schema["order_approved_at"].dataType == TimestampType()
 
@@ -156,7 +159,7 @@ class TestOrdersTransformations:
             "order_purchase_timestamp",
             "order_approved_at"
         ])
-        
+
         df_transformed = df \
             .withColumn("order_purchase_timestamp", F.to_timestamp("order_purchase_timestamp")) \
             .withColumn("order_approved_at", F.to_timestamp("order_approved_at")) \
@@ -167,7 +170,7 @@ class TestOrdersTransformations:
                     2
                 )
             )
-        
+
         result = df_transformed.collect()[0]
         assert result["approval_delay_hours"] == 2.5
 
@@ -183,7 +186,7 @@ class TestOrdersTransformations:
             "order_delivered_customer_date",
             "order_estimated_delivery_date"
         ])
-        
+
         df_transformed = df \
             .withColumn("order_delivered_customer_date", F.to_timestamp("order_delivered_customer_date")) \
             .withColumn("order_estimated_delivery_date", F.to_timestamp("order_estimated_delivery_date")) \
@@ -191,7 +194,7 @@ class TestOrdersTransformations:
                 "delivery_delay_days",
                 F.datediff("order_delivered_customer_date", "order_estimated_delivery_date")
             )
-        
+
         result = df_transformed.collect()[0]
         assert result["delivery_delay_days"] == 5  # 5 days late
 
@@ -207,7 +210,7 @@ class TestOrdersTransformations:
             "order_delivered_customer_date",
             "order_estimated_delivery_date"
         ])
-        
+
         df_transformed = df \
             .withColumn("order_delivered_customer_date", F.to_timestamp("order_delivered_customer_date")) \
             .withColumn("order_estimated_delivery_date", F.to_timestamp("order_estimated_delivery_date")) \
@@ -215,7 +218,7 @@ class TestOrdersTransformations:
                 "delivery_delay_days",
                 F.datediff("order_delivered_customer_date", "order_estimated_delivery_date")
             )
-        
+
         result = df_transformed.collect()[0]
         assert result["delivery_delay_days"] == -5  # 5 days early
 
@@ -227,9 +230,9 @@ class TestReviewsTransformations:
         """Verify review_score is cast to integer."""
         data = [("review_1", "5"), ("review_2", "3")]
         df = spark.createDataFrame(data, ["review_id", "review_score"])
-        
+
         df_transformed = df.withColumn("review_score", F.col("review_score").cast("int"))
-        
+
         assert df_transformed.schema["review_score"].dataType == IntegerType()
         scores = [r["review_score"] for r in df_transformed.collect()]
         assert scores == [5, 3]
@@ -241,12 +244,12 @@ class TestReviewsTransformations:
             ("review_2", "Not satisfied")
         ]
         df = spark.createDataFrame(data, ["review_id", "review_comment_message"])
-        
+
         df_transformed = df.withColumn(
             "review_length",
             F.length(F.col("review_comment_message"))
         )
-        
+
         results = df_transformed.collect()
         assert results[0]["review_length"] == len("Great product!")
         assert results[1]["review_length"] == len("Not satisfied")
@@ -263,11 +266,11 @@ class TestReviewsTransformations:
             "review_creation_date",
             "review_answer_timestamp"
         ])
-        
+
         df_transformed = df \
             .withColumn("review_creation_date", F.to_timestamp("review_creation_date")) \
             .withColumn("review_answer_timestamp", F.to_timestamp("review_answer_timestamp"))
-        
+
         assert df_transformed.schema["review_creation_date"].dataType == TimestampType()
         assert df_transformed.schema["review_answer_timestamp"].dataType == TimestampType()
 
@@ -282,12 +285,12 @@ class TestCustomersTransformations:
             ("customer_2", "Rio de Janeiro")
         ]
         df = spark.createDataFrame(data, ["customer_id", "customer_city"])
-        
+
         df_transformed = df.withColumn(
             "customer_city",
             F.upper(F.trim("customer_city"))
         )
-        
+
         results = df_transformed.collect()
         assert results[0]["customer_city"] == "SAO PAULO"
         assert results[1]["customer_city"] == "RIO DE JANEIRO"
@@ -299,12 +302,12 @@ class TestCustomersTransformations:
             ("customer_2", "rj")
         ]
         df = spark.createDataFrame(data, ["customer_id", "customer_state"])
-        
+
         df_transformed = df.withColumn(
             "customer_state",
             F.upper(F.trim("customer_state"))
         )
-        
+
         results = df_transformed.collect()
         assert results[0]["customer_state"] == "SP"
         assert results[1]["customer_state"] == "RJ"
@@ -321,15 +324,15 @@ class TestCDCMergeLogic:
             ("order_2", "2024-01-15 09:00:00", "status_3")
         ]
         df = spark.createDataFrame(data, ["order_id", "timestamp", "status"])
-        
+
         df = df.withColumn("timestamp", F.to_timestamp("timestamp"))
-        
+
         # Simulate CDC deduplication
         window_spec = Window.partitionBy("order_id").orderBy(F.col("timestamp").desc())
         deduped_df = df.withColumn("_rn", F.row_number().over(window_spec)) \
             .filter("_rn = 1") \
             .drop("_rn")
-        
+
         assert deduped_df.count() == 2
         order_1_status = deduped_df.filter("order_id = 'order_1'").collect()[0]["status"]
         assert order_1_status == "status_2"  # Latest status kept
@@ -343,14 +346,14 @@ class TestCDCMergeLogic:
             ("order_2", "2024-01-15 09:00:00", 200.0)
         ]
         df = spark.createDataFrame(data, ["order_id", "timestamp", "amount"])
-        
+
         df = df.withColumn("timestamp", F.to_timestamp("timestamp"))
-        
+
         window_spec = Window.partitionBy("order_id").orderBy(F.col("timestamp").desc())
         deduped_df = df.withColumn("_rn", F.row_number().over(window_spec)) \
             .filter("_rn = 1") \
             .drop("_rn")
-        
+
         assert deduped_df.count() == 2
         order_1_amount = deduped_df.filter("order_id = 'order_1'").collect()[0]["amount"]
         assert order_1_amount == 120.0
