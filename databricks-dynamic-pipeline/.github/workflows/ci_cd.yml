@@ -23,15 +23,23 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pyspark ruff databricks-sdk
+          pip install pytest pytest-cov pyspark ruff databricks-sdk
 
       - name: Run Ruff Linter
         run: |
           ruff check src/ tests/ --ignore E501
 
-      - name: Execute PySpark Unit Tests
+      - name: Execute PySpark Unit Tests with Coverage
         run: |
-          pytest tests/ -v --tb=short
+          pytest tests/ -v --tb=short --cov=src --cov-report=html --cov-report=term-missing
+
+      - name: Upload Coverage Report as Artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: htmlcov/
+          retention-days: 30
 
   bundle-deploy:
     name: Validate & Deploy Databricks Bundle
@@ -50,7 +58,15 @@ jobs:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: |
-          databricks bundle validate -t dev
+          databricks bundle validate --strict -t dev
+
+      - name: Generate Bundle Summary
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          databricks bundle summary -t dev > bundle_summary.txt
+          cat bundle_summary.txt
 
       - name: Deploy to Staging (Dev/Feature Branches)
         if: github.ref != 'refs/heads/main'
@@ -58,7 +74,9 @@ jobs:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: |
+          echo "::notice ::Deploying to dev environment"
           databricks bundle deploy -t dev
+          echo "::notice ::Deployment to dev completed successfully"
 
       - name: Deploy to Production (Merged to Main)
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -66,4 +84,76 @@ jobs:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: |
+          echo "::notice ::Deploying to production environment"
           databricks bundle deploy -t prod
+          echo "::notice ::Production deployment completed successfully"
+
+      - name: Create Deployment Tag
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          TAG="prod-$(date +%Y%m%d-%H%M%S)"
+          git tag -a "$TAG" -m "Production deployment $TAG"
+          git push origin "$TAG"
+
+  integration-tests:
+    name: Integration Tests (Post-Deploy)
+    needs: bundle-deploy
+    runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/main'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Run Integration Test Job
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          echo "::notice ::Integration tests would run here"
+          echo "Example: Run a test job that validates pipeline end-to-end"
+          # databricks jobs run-now --job-id <integration-test-job-id>
+
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Safety for Dependency Scanning
+        run: |
+          pip install safety
+
+      - name: Check Dependencies for Vulnerabilities
+        run: |
+          pip install pytest pyspark databricks-sdk
+          pip freeze > requirements_frozen.txt
+          safety check --file requirements_frozen.txt --output text || true
+
+      - name: Run Bandit for Security Issues
+        run: |
+          pip install bandit
+          bandit -r src/ -f txt -o bandit_report.txt || true
+          cat bandit_report.txt
+
+      - name: Upload Security Reports
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: |
+            bandit_report.txt
+            requirements_frozen.txt
+          retention-days: 30
