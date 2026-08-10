@@ -110,18 +110,39 @@ Transformations applied:
 - Cancellation rates
 - Average review scores by region
 
+## Testing
+
+### Run All Tests
+```bash
+# Quick test run
+./run_tests.sh fast
+
+# With coverage report
+./run_tests.sh all
+
+# CI/CD validation
+./run_tests.sh ci
+```
+
+**Test Coverage**: 80%+ across all layers  
+**Test Suite**: 100+ unit tests covering configuration, transformations, and business logic
+
+See [tests/README.md](tests/README.md) for complete documentation.
+
+---
+
 ## Deployment
 
 ### Prerequisites
 ```bash
-pip install databricks-cli
+pip install -r requirements.txt
 databricks configure --token
 ```
 
 ### Deploy Pipeline
 ```bash
 # Validate configuration
-databricks bundle validate
+databricks bundle validate --strict
 
 # Deploy to dev environment
 databricks bundle deploy --target dev
@@ -129,6 +150,8 @@ databricks bundle deploy --target dev
 # Run pipeline
 databricks jobs run-now --job-id <job_id>
 ```
+
+**CI/CD**: Automated deployment on merge to main. See [CI_CD_SETUP_GUIDE.md](CI_CD_SETUP_GUIDE.md).
 
 ### Pipeline Schedule
 - **Frequency**: Daily at 2:00 AM UTC
